@@ -1,0 +1,12 @@
+.env
+.env.*
+*.env
+var/
+work/
+.venv/
+node_modules/
+.state/
+__pycache__/
+.DS_Store
+signing/
+build/

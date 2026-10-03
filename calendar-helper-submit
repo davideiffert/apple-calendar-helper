@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Send one command to Apple Calendar Helper and print its result."""
+import json
+import os
+import sys
+import time
+import uuid
+from pathlib import Path
+
+RUNTIME = Path(os.environ.get("CALENDAR_HELPER_HOME") or Path.home() / "Library/Application Support/apple-calendar-helper")
+COMMANDS = RUNTIME / "commands"
+RESULTS = RUNTIME / "results"
+STATUS = RUNTIME / "status.json"
+START_HINT = 'Start it with: open -a "Apple Calendar Helper"'
+COMMANDS_HELP = "list-calendars, dump-events, create-events, update-all-day-end, delete-event, delete-event-series"
+STARTUP_GRACE = 5  # seconds to wait for a helper that was just opened
+BUNDLE_ID = "io.github.davideiffert.apple-calendar-helper"
+ACCESS_HINT = ('Allow "Apple Calendar Helper" in System Settings > Privacy & Security > Calendars. '
+               f"If it is already on, or you just rebuilt the app, run: tccutil reset Calendar {BUNDLE_ID} "
+               '&& open -a "Apple Calendar Helper", then click Allow')
+
+
+def fail(message):
+    print(f"error={message}", file=sys.stderr)
+    return 1
+
+
+def read_status():
+    try:
+        status = json.loads(STATUS.read_text())
+        return status if isinstance(status, dict) else {}
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {}
+
+
+def helper_problem():
+    """Explain why the helper cannot answer, or return None if it looks alive."""
+    status = read_status()
+    if status is None:
+        return f"the helper has never run with this folder ({RUNTIME}). {START_HINT}"
+    if status.get("status") == "access-denied":
+        return f"the helper was denied calendar access. {ACCESS_HINT}"
+    try:
+        os.kill(int(status["pid"]), 0)
+    except (KeyError, TypeError, ValueError, ProcessLookupError):
+        return f"the helper is not running. {START_HINT}"
+    except PermissionError:
+        pass
+    return None
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: calendar-helper-submit <command> [args...]", file=sys.stderr)
+        print(f"commands: {COMMANDS_HELP}", file=sys.stderr)
+        return 2
+
+    try:
+        timeout = float(os.environ.get("CALENDAR_HELPER_TIMEOUT", "120"))
+    except ValueError:
+        return fail("CALENDAR_HELPER_TIMEOUT must be a number of seconds")
+
+    # A helper opened a moment ago may not have replaced the last run's status yet.
+    grace = time.time() + STARTUP_GRACE
+    problem = helper_problem()
+    while problem and time.time() < grace:
+        time.sleep(0.25)
+        problem = helper_problem()
+    if problem:
+        return fail(problem)
+
+    command_id = f"{int(time.time())}-{uuid.uuid4().hex}"
+    command_path = COMMANDS / f"{command_id}.json"
+    result_path = RESULTS / f"{command_id}.result.json"
+    payload = {"id": command_id, "command": sys.argv[1], "args": sys.argv[2:], "cwd": os.getcwd()}
+    try:
+        COMMANDS.mkdir(parents=True, exist_ok=True)
+        RESULTS.mkdir(parents=True, exist_ok=True)
+        tmp_path = COMMANDS / f".{command_id}.json.tmp"
+        tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        os.replace(tmp_path, command_path)
+    except OSError as error:
+        return fail(f"cannot write to {COMMANDS}: {error.strerror}. Check the folder's permissions or set CALENDAR_HELPER_HOME")
+
+    def give_up(reason):
+        try:
+            command_path.unlink()
+            return fail(f"{reason}. The command did not run")
+        except FileNotFoundError:
+            return fail(f"{reason}. The helper had already picked up the command, so it may have run. "
+                        "Check with dump-events before retrying a change")
+
+    waiting_noted = False
+    deadline = time.time() + timeout
+    next_check = time.time() + 2
+    while time.time() < deadline:
+        if result_path.exists():
+            try:
+                result = json.loads(result_path.read_text())
+            except (OSError, ValueError):
+                time.sleep(0.25)
+                continue
+            result_path.unlink(missing_ok=True)
+            for line in result.get("lines", []):
+                print(line)
+            return 0 if result.get("ok") else 1
+        if time.time() >= next_check:
+            next_check = time.time() + 2
+            problem = helper_problem()
+            if problem:
+                return give_up(problem)
+            if not waiting_noted and (read_status() or {}).get("status") == "waiting-for-permission":
+                print("waiting for you to allow calendar access in the macOS prompt...", file=sys.stderr)
+                waiting_noted = True
+        time.sleep(0.25)
+
+    return give_up(f"timed out after {timeout:g} seconds. Check {STATUS}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
