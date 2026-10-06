@@ -7,6 +7,7 @@ Bridges local scripts and agents to Apple Calendar through EventKit. README.md h
 - The helper must be running: `open -a "Apple Calendar Helper"` (after the first launch from `build/`).
 - Send commands with `./calendar-helper-submit <command> [args...]`.
 - Commands: `list-calendars`, `dump-events`, `create-events`, `update-event`, `delete-event`.
+- Read events with `./calendar-helper-submit dump-events <account> <calendar or '*'> <start yyyy-mm-dd> <end yyyy-mm-dd> <output.json>`. The end date is exclusive. Quote `'*'` to include all calendars in an account, and repeat for each account. See the README's seven-day example.
 - `dump-events` output uses the same fields that `create-events` and `update-event` take. To edit, dump, change fields, and send them back.
 - Repeats are RRULE strings: `FREQ=MONTHLY;BYDAY=3WE` (third Wednesday), `FREQ=MONTHLY;BYDAY=-1FR` (last Friday), `FREQ=WEEKLY;INTERVAL=2;BYDAY=TU`, or `weekly`.
 - Runtime files live in `~/Library/Application Support/apple-calendar-helper/` unless `CALENDAR_HELPER_HOME` is set.
