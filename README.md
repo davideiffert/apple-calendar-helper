@@ -1,14 +1,18 @@
 # Apple Calendar Helper
 
-Let your AI agents and scripts read and write every calendar on your Mac.
+Let your AI agents use the calendars already on your Mac.
 
-Apple has no API that covers every calendar in the Calendar app. iCloud speaks CalDAV, but only for iCloud calendars, and it needs an app-specific password. EventKit sees every account on the Mac, but it only works inside an app the user has granted calendar access, and agents usually run in a terminal or over SSH. This helper is that app. Anything that can write a file can ask it to do calendar work.
+Ask your agent what next week looks like, or have it make a calendar change you requested. Apple Calendar Helper gives local agents and scripts a way to read and change events through a small background app with macOS calendar permission.
 
-![Real output from a test calendar: a batch with an unsupported rule creates nothing, a fixed batch creates 7 events, and deleting one occurrence of a repeating event needs a span](docs/screenshot.png)
+![Your agent sends a local command to Apple Calendar Helper, which accesses the calendars on your Mac](docs/social-preview.png)
+
+*How it works. This graphic is an illustration, not an app screenshot.*
+
+iCloud's CalDAV API covers iCloud calendars. Apple's EventKit API sees the accounts in Calendar on your Mac, but it needs calendar permission. The helper holds that permission and accepts commands through local files. It has no hosted service or separate calendar account. Read-only calendars stay read-only.
 
 ## Try it
 
-Needs a Mac and the Xcode command line tools (`xcode-select --install`).
+Needs a Mac and the Xcode command line tools (`xcode-select --install`). This release builds from source; it does not include a downloadable app.
 
 ```bash
 git clone https://github.com/davideiffert/apple-calendar-helper
@@ -19,6 +23,26 @@ open "build/Apple Calendar Helper.app"
 ```
 
 The first launch shows the macOS calendar permission prompt. Click Allow. `list-calendars` waits for that, then prints each account, calendar name, and ID. After the first launch, `open -a "Apple Calendar Helper"` starts it from anywhere.
+
+### Read the next seven days
+
+Use an account name from `list-calendars`. This example reads every calendar in the `iCloud` account, from today up to the same day next week, and writes `events.json`. It does not change any events.
+
+```bash
+./calendar-helper-submit dump-events "iCloud" '*' \
+  "$(date +%F)" "$(date -v+7d +%F)" events.json
+python3 -m json.tool events.json
+```
+
+The date commands above are for macOS. To read another account, replace `iCloud` with its name. Repeat for each account you want included.
+
+### Give it to your agent
+
+Open this checkout in your agent and give it a task like:
+
+> Read this repository's AGENTS.md. Use calendar-helper-submit to list the accounts, then read the next seven days from each account and summarize my week. Use only list-calendars and dump-events. Do not change events.
+
+The agent needs to run on this Mac or reach it over SSH. The helper must already be running and have calendar permission. Calendar changes still need your instruction.
 
 ## How it works
 
@@ -160,6 +184,10 @@ Everything is checked before saving. The receipt holds the event before and afte
 A repeating event needs the occurrence's start and a span. `--span future` from the first occurrence deletes the whole series.
 
 ## When something goes wrong
+
+This real output from a throwaway test calendar shows invalid input creating nothing, a corrected batch creating seven events, and a repeating-event deletion requiring an explicit span.
+
+![Real test-calendar output showing validation and a corrected batch](docs/screenshot.png)
 
 Results print as `key=value` lines (`list-calendars` prints one tab-separated row per calendar). Failures exit non-zero and say what to do next:
 
