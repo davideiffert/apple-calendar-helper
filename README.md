@@ -2,7 +2,7 @@
 
 Let your AI agents use the calendars already on your Mac.
 
-Ask your agent what next week looks like, or have it make a calendar change you requested. Apple Calendar Helper gives local agents and scripts a way to read and change events through a small background app with macOS calendar permission.
+Ask your agent what next week looks like, or ask it to add or move an event. Apple Calendar Helper gives local agents and scripts a way to read and change events through a small background app with macOS calendar permission.
 
 ![Your agent sends a local command to Apple Calendar Helper, which accesses the calendars on your Mac](docs/social-preview.png)
 
@@ -22,7 +22,7 @@ open "build/Apple Calendar Helper.app"
 ./calendar-helper-submit list-calendars
 ```
 
-The first launch shows the macOS calendar permission prompt. Click Allow. `list-calendars` waits for that, then prints each account, calendar name, and ID. After the first launch, `open -a "Apple Calendar Helper"` starts it from anywhere.
+The first launch shows the calendar permission prompt on the Mac's screen. Approve calendar access there. `list-calendars` waits for that, then prints each account, calendar name, and ID. After the first launch, `open -a "Apple Calendar Helper"` starts it from anywhere.
 
 ### Read the next seven days
 
@@ -42,7 +42,7 @@ Open this checkout in your agent and give it a task like:
 
 > Read this repository's AGENTS.md. Use calendar-helper-submit to list the accounts, then read the next seven days from each account and summarize my week. Use only list-calendars and dump-events. Do not change events.
 
-The agent needs to run on this Mac or reach it over SSH. The helper must already be running and have calendar permission. Calendar changes still need your instruction.
+The agent needs to run on this Mac or reach it over SSH. The helper must already be running and have calendar permission. It executes submitted commands without asking before each change. [AGENTS.md](AGENTS.md) tells the agent to change events only when you requested that change.
 
 ## How it works
 
@@ -185,7 +185,7 @@ A repeating event needs the occurrence's start and a span. `--span future` from 
 
 ## When something goes wrong
 
-This real output from a throwaway test calendar shows invalid input creating nothing, a corrected batch creating seven events, and a repeating-event deletion requiring an explicit span.
+This output from a throwaway test calendar shows invalid input creating nothing, a corrected batch creating seven events, and a repeating-event deletion requiring an explicit span. Event IDs are shortened for readability.
 
 ![Real test-calendar output showing validation and a corrected batch](docs/screenshot.png)
 
@@ -194,7 +194,7 @@ Results print as `key=value` lines (`list-calendars` prints one tab-separated ro
 ```
 error=calendar not found: iCloud/Wrok. Run list-calendars to see account and calendar names
 error=the helper is not running. Start it with: open -a "Apple Calendar Helper"
-error=event 0 ("Planning"): missing field "calendarTitle"
+error=event 0 ("Planning"): missing field "endDate"
 error=nothing was created. Fix the errors above and run it again
 ```
 
